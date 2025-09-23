@@ -244,41 +244,6 @@
             setInterval(refreshSignals, 10000);
         });
 
-        // Manual trade form submission
-        document.getElementById('tradeForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const formData = {
-                pair: document.getElementById('tradePair').value,
-                direction: document.getElementById('tradeDirection').value,
-                entry_price: document.getElementById('entryPrice').value,
-                stop_loss: document.getElementById('stopLoss').value,
-                take_profit: document.getElementById('takeProfit').value,
-                result: document.getElementById('tradeResult').value,
-                reasoning: document.getElementById('tradeReasoning').value,
-                created_by: document.getElementById('userName').value || 'Anonymous'
-            };
-
-            try {
-                await fetch('/api/trades', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(formData)
-                });
-                
-                // Clear form
-                document.getElementById('tradeForm').reset();
-                
-                // Refresh trades list
-                loadTrades();
-                
-                alert('Trade saved successfully!');
-            } catch (error) {
-                console.error('Error saving trade:', error);
-                alert('Error saving trade');
-            }
-        });
-
         // Tab management
         function showTab(tabName) {
             // Hide all tabs
@@ -417,24 +382,36 @@
             document.getElementById('entryForm').reset();
         }
 
-        // Submit analysis
-        document.getElementById('analysisForm').addEventListener('submit', async function(e) {
+        // Entry form submission
+        document.getElementById('entryForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const userName = document.getElementById('userName').value || 'Anonymous';
-            
+            const formData = {
+                signal_id: document.getElementById('entrySignalId').value,
+                pair: document.getElementById('entryPair').value,
+                direction: document.getElementById('entryDirection').value,
+                entry_price: document.getElementById('entryEntryPrice').value,
+                stop_loss: document.getElementById('entryStopLoss').value,
+                take_profit: document.getElementById('entryTakeProfit').value,
+                reasoning: document.getElementById('entryReasoning').value,
+                created_by: document.getElementById('userName').value || 'Anonymous'
+            };
+
             try {
-                await fetch(`/api/signals/${currentSignalId}/analyze`, {
+                await fetch('/api/trades', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_name: userName })
+                    body: JSON.stringify(formData)
                 });
                 
-                closeAnalysisModal();
-                refreshSignals();
-                loadLeaderboard();
+                closeEntryModal();
+                loadTrades();
+                
+                // Show success message
+                alert('Trade entry saved successfully!');
             } catch (error) {
-                console.error('Error submitting analysis:', error);
+                console.error('Error saving trade entry:', error);
+                alert('Error saving trade entry');
             }
         });
 
@@ -575,7 +552,7 @@
             }
 
             try {
-                const stream = await navigator.mediaUserMedia.getUserMedia({ audio: true });
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(stream);
                 audioChunks = [];
 
@@ -598,18 +575,18 @@
             }
         }
 
-        // Entry form submission
-        document.getElementById('entryForm').addEventListener('submit', async function(e) {
+        // Manual trade form submission
+        document.getElementById('tradeForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const formData = {
-                signal_id: document.getElementById('entrySignalId').value,
-                pair: document.getElementById('entryPair').value,
-                direction: document.getElementById('entryDirection').value,
-                entry_price: document.getElementById('entryEntryPrice').value,
-                stop_loss: document.getElementById('entryStopLoss').value,
-                take_profit: document.getElementById('entryTakeProfit').value,
-                reasoning: document.getElementById('entryReasoning').value,
+                pair: document.getElementById('tradePair').value,
+                direction: document.getElementById('tradeDirection').value,
+                entry_price: document.getElementById('entryPrice').value,
+                stop_loss: document.getElementById('stopLoss').value,
+                take_profit: document.getElementById('takeProfit').value,
+                result: document.getElementById('tradeResult').value,
+                reasoning: document.getElementById('tradeReasoning').value,
                 created_by: document.getElementById('userName').value || 'Anonymous'
             };
 
@@ -620,14 +597,16 @@
                     body: JSON.stringify(formData)
                 });
                 
-                closeEntryModal();
+                // Clear form
+                document.getElementById('tradeForm').reset();
+                
+                // Refresh trades list
                 loadTrades();
                 
-                // Show success message
-                alert('Trade entry saved successfully!');
+                alert('Trade saved successfully!');
             } catch (error) {
-                console.error('Error saving trade entry:', error);
-                alert('Error saving trade entry');
+                console.error('Error saving trade:', error);
+                alert('Error saving trade');
             }
         });
     </script>
