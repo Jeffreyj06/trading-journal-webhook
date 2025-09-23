@@ -163,26 +163,66 @@
         </div>
     </div>
 
-    <!-- Signal Analysis Modal -->
-    <div id="analysisModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-gray-800 p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 class="text-lg font-semibold mb-4">Analyze Signal</h3>
-            <div id="signalDetails" class="mb-4">
-                <!-- Signal details will be inserted here -->
+    <!-- Entry Modal -->
+    <div id="entryModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-gray-800 p-6 rounded-lg max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">Create Trade Entry</h3>
+                <button onclick="closeEntryModal()" class="text-gray-400 hover:text-white">✕</button>
             </div>
-            <form id="analysisForm">
-                <div class="mb-4">
-                    <label class="block text-sm font-medium mb-2">Your Analysis</label>
-                    <textarea id="analysisReasoning" rows="3" placeholder="Why would you take or skip this trade?" 
+            
+            <form id="entryForm" class="space-y-4">
+                <input type="hidden" id="entrySignalId">
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Currency Pair</label>
+                    <input type="text" id="entryPair" readonly 
+                           class="w-full bg-gray-600 border border-gray-500 rounded px-3 py-2 text-gray-300 cursor-not-allowed">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Direction</label>
+                    <select id="entryDirection" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2">
+                        <option value="long">Long (Buy)</option>
+                        <option value="short">Short (Sell)</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Entry Price</label>
+                    <input type="number" step="0.00001" id="entryEntryPrice" 
+                           class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Stop Loss</label>
+                    <input type="number" step="0.00001" id="entryStopLoss" 
+                           class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Take Profit</label>
+                    <input type="number" step="0.00001" id="entryTakeProfit" 
+                           class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Trading Reasoning</label>
+                    <textarea id="entryReasoning" rows="3" placeholder="Why did you take this trade?" 
                               class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2"></textarea>
                 </div>
+
                 <div class="flex space-x-2">
-                    <button type="button" onclick="closeAnalysisModal()" 
+                    <button type="button" onclick="startRecording()" 
+                            class="px-4 py-2 bg-red-600 rounded hover:bg-red-700 transition">
+                        🎤 Voice Note
+                    </button>
+                    <button type="button" onclick="closeEntryModal()" 
                             class="px-4 py-2 bg-gray-600 rounded hover:bg-gray-700">
                         Cancel
                     </button>
                     <button type="submit" class="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700">
-                        Submit Analysis
+                        Save Trade
                     </button>
                 </div>
             </form>
@@ -202,6 +242,41 @@
             
             // Auto-refresh signals every 10 seconds
             setInterval(refreshSignals, 10000);
+        });
+
+        // Manual trade form submission
+        document.getElementById('tradeForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                pair: document.getElementById('tradePair').value,
+                direction: document.getElementById('tradeDirection').value,
+                entry_price: document.getElementById('entryPrice').value,
+                stop_loss: document.getElementById('stopLoss').value,
+                take_profit: document.getElementById('takeProfit').value,
+                result: document.getElementById('tradeResult').value,
+                reasoning: document.getElementById('tradeReasoning').value,
+                created_by: document.getElementById('userName').value || 'Anonymous'
+            };
+
+            try {
+                await fetch('/api/trades', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                
+                // Clear form
+                document.getElementById('tradeForm').reset();
+                
+                // Refresh trades list
+                loadTrades();
+                
+                alert('Trade saved successfully!');
+            } catch (error) {
+                console.error('Error saving trade:', error);
+                alert('Error saving trade');
+            }
         });
 
         // Tab management
@@ -276,9 +351,13 @@
                             </div>
                             <div class="flex space-x-2">
                                 ${!signal.analyzed ? `
-                                    <button onclick="analyzeSignal('${signal.id}')" 
+                                    <button onclick="openTradingView('${signal.ticker}')" 
                                             class="px-3 py-1 bg-blue-600 rounded hover:bg-blue-700 text-sm">
                                         Analyze
+                                    </button>
+                                    <button onclick="createEntry('${signal.id}', '${signal.ticker}', ${signal.price})" 
+                                            class="px-3 py-1 bg-green-600 rounded hover:bg-green-700 text-sm ml-1">
+                                        Entry
                                     </button>
                                 ` : ''}
                             </div>
@@ -288,31 +367,54 @@
             }).join('');
         }
 
-        // Analyze signal
-        function analyzeSignal(signalId) {
-            currentSignalId = signalId;
-            const signals = document.getElementById('signalsList').dataset.signals || '[]';
-            const signal = JSON.parse(signals).find(s => s.id === signalId);
+        // Open TradingView app with specific pair
+        function openTradingView(ticker) {
+            // Format ticker for TradingView (remove any special characters)
+            const cleanTicker = ticker.replace(/[^A-Z]/g, '');
             
-            document.getElementById('signalDetails').innerHTML = `
-                <div class="bg-gray-700 p-3 rounded">
-                    <div class="flex justify-between">
-                        <span>Pair: <strong>${signal.ticker}</strong></span>
-                        <span>Direction: <strong class="${signal.action === 'buy' ? 'text-green-400' : 'text-red-400'}">${signal.action.toUpperCase()}</strong></span>
-                    </div>
-                    <div class="text-sm text-gray-400 mt-1">Price: ${signal.price} | Received: ${getTimeAgo(new Date(signal.received_at))}</div>
-                </div>
-            `;
+            // Try to open TradingView mobile app first
+            const mobileAppUrl = `tradingview://symbol/FX_IDC:${cleanTicker}`;
+            const webUrl = `https://www.tradingview.com/chart/?symbol=FX_IDC:${cleanTicker}`;
             
-            document.getElementById('analysisModal').classList.remove('hidden');
-            document.getElementById('analysisModal').classList.add('flex');
+            // Check if we're on mobile
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            if (isMobile) {
+                // Try to open mobile app
+                window.location.href = mobileAppUrl;
+                
+                // Fallback to web after a short delay if app doesn't open
+                setTimeout(() => {
+                    window.open(webUrl, '_blank');
+                }, 1000);
+            } else {
+                // Open web version on desktop
+                window.open(webUrl, '_blank');
+            }
         }
 
-        // Close analysis modal
-        function closeAnalysisModal() {
-            document.getElementById('analysisModal').classList.add('hidden');
-            document.getElementById('analysisModal').classList.remove('flex');
-            currentSignalId = null;
+        // Create trade entry from signal
+        function createEntry(signalId, ticker, price) {
+            // Store signal data
+            document.getElementById('entrySignalId').value = signalId;
+            document.getElementById('entryPair').value = ticker;
+            document.getElementById('entryEntryPrice').value = price;
+            
+            // Show entry modal
+            document.getElementById('entryModal').classList.remove('hidden');
+            document.getElementById('entryModal').classList.add('flex');
+            
+            // Focus on direction field
+            document.getElementById('entryDirection').focus();
+        }
+
+        // Close entry modal
+        function closeEntryModal() {
+            document.getElementById('entryModal').classList.add('hidden');
+            document.getElementById('entryModal').classList.remove('flex');
+            
+            // Clear form
+            document.getElementById('entryForm').reset();
         }
 
         // Submit analysis
@@ -496,18 +598,18 @@
             }
         }
 
-        // Manual trade form submission
-        document.getElementById('tradeForm').addEventListener('submit', async function(e) {
+        // Entry form submission
+        document.getElementById('entryForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const formData = {
-                pair: document.getElementById('tradePair').value,
-                direction: document.getElementById('tradeDirection').value,
-                entry_price: document.getElementById('entryPrice').value,
-                stop_loss: document.getElementById('stopLoss').value,
-                take_profit: document.getElementById('takeProfit').value,
-                result: document.getElementById('tradeResult').value,
-                reasoning: document.getElementById('tradeReasoning').value,
+                signal_id: document.getElementById('entrySignalId').value,
+                pair: document.getElementById('entryPair').value,
+                direction: document.getElementById('entryDirection').value,
+                entry_price: document.getElementById('entryEntryPrice').value,
+                stop_loss: document.getElementById('entryStopLoss').value,
+                take_profit: document.getElementById('entryTakeProfit').value,
+                reasoning: document.getElementById('entryReasoning').value,
                 created_by: document.getElementById('userName').value || 'Anonymous'
             };
 
@@ -518,16 +620,14 @@
                     body: JSON.stringify(formData)
                 });
                 
-                // Clear form
-                document.getElementById('tradeForm').reset();
-                
-                // Refresh trades list
+                closeEntryModal();
                 loadTrades();
                 
-                alert('Trade saved successfully!');
+                // Show success message
+                alert('Trade entry saved successfully!');
             } catch (error) {
-                console.error('Error saving trade:', error);
-                alert('Error saving trade');
+                console.error('Error saving trade entry:', error);
+                alert('Error saving trade entry');
             }
         });
     </script>
